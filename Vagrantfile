@@ -1,0 +1,45 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/focal64"
+  num_nodes = 2
+  vm_memory = 2048
+  vm_cpu = 1
+
+  manager_ip = "192.168.100.100"
+  config.vm.define "manager" do |manager|
+    manager.vm.hostname = "manager"
+    manager.vm.network "private_network", ip: manager_ip
+    
+    manager.vm.provider "virtualbox" do |vb|
+      vb.name = "manager"
+      vb.memory = vm_memory
+      vb.cpus = vm_cpu
+    end
+  end
+
+  node01_ip = "192.168.100.101"
+  config.vm.define "node01" do |node01|
+    node01.vm.hostname = "node01"
+    node01.vm.network "private_network", ip: node01_ip
+
+    node01.vm.provider "virtualbox" do |vb|
+      vb.name = "node01"
+      vb.memory = vm_memory
+      vb.cpus = vm_cpu
+    end
+
+    node01.vm.network "forwarded_port", guest: 8087, host: 8087
+    node01.vm.network "forwarded_port", guest: 8081, host: 8081
+  end
+
+  node02_ip = "192.168.100.102"
+  config.vm.define "node02" do |node02|
+    node02.vm.hostname = "node02"
+    node02.vm.network "private_network", ip: node02_ip
+    
+    node02.vm.provider "virtualbox" do |vb|
+      vb.name = "node02"
+      vb.memory = vm_memory
+      vb.cpus = vm_cpu
+    end
+  end
+end
