@@ -215,4 +215,17 @@ tasks/main.yml роли postgresql
         query:
         INSERT INTO "table" (value) VALUES ('sometext1'), ('sometext2'), ('sometext3')
 
+Прогоним **Postman** тесты        
+
+![postman](screenshots/image9.png)
+
+Проверим доступность **Apache** сервера
+
+![apache_page](screenshots/image10.png)
+
+Подключимся к **Postgresql** через **pgadmin4** с хоста
+
+![pgadmin4](screenshots/image11.png)
+
+
 ## Part 2. Service Discovery
