@@ -9,6 +9,8 @@ services:
 
   gateway-service:
     image: asskkord/asskkord-images:gateway-service
+    ports:
+      - "8087:8087"
 
   hotel-service:
     image: asskkord/asskkord-images:hotel-service
@@ -24,12 +26,8 @@ services:
 
   session-service:
     image: asskkord/asskkord-images:session-service
+    ports:
+      - "8081:8081"
 
   rabbit:
     image: asskkord/asskkord-images:rabbitmq
-
-  nginx:
-    image: asskkord/asskkord-images:nginx-proxy
-    ports:
-      - "8081:8081"
-      - "8087:8087"

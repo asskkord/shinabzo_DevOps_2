@@ -1,0 +1,6 @@
+---
+# tasks file for application
+- name: install apache
+  apt:
+    name: apache2
+    update_cache: yes

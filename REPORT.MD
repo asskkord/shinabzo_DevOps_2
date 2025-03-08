@@ -6,7 +6,7 @@
  
 Заходим на **manager** командой `vagrant ssh manager`
 
-Попробуем подключиться к **node01** по ssh с паролем. Для этого на node01 нужно в файле **/etc/ssh/sshd_config** перевести поле **PasswordAuthentication** в **yes**. Применить изенения командой `sudo systemctl restart sshd`. Пытакемся подключиться:
+Попробуем подключиться к **node01** по ssh с паролем. Для этого на node01 нужно в файле **/etc/ssh/sshd_config** перевести поле **PasswordAuthentication** в **yes**. Применить изенения командой `sudo systemctl restart sshd`. Пытаемся подключиться:
 
 ![ssh_password](screenshots/image2.png)
 
@@ -104,7 +104,115 @@
 
 ![postman](screenshots/image6.png)
 
+Создадим 3 роли:
 
+![roles_init](screenshots/image8.png)
 
+Для работы с **postgres** понадобится также установить community модуль командой и прочие зависимости: 
+
+`ansible-galaxy collection install community.postgresql`
+
+Роль **application** фактически мы уже написали.
+
+tasks/main.yml роли **apache**
+---
+    # tasks file for application
+    - name: install apache
+    apt:
+        name: apache2
+        update_cache: yes // устанавливаем apache и все работает из коробки
+
+vars/main.yml роли postgresql
+---
+    # Variables for the role 
+    db_user: myuser
+    db_password: mypassword // устанавливаем параметры доступа к бд
+    db_name: mydatabase
+
+tasks/main.yml роли postgresql 
+---
+    - name: add postgresql apt key
+    apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: add postgresql repository
+    apt_repository:
+        repo: deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main
+        state: present
+
+    - name: install postgresql and dependencies
+    apt:
+        name:
+        - acl
+        - libpq-dev
+        - python3-psycopg2
+        - postgresql-12
+        update_cache: yes
+        state: present
+
+    - name: enable and start postgresql service
+    service:
+        name: postgresql
+        enabled: yes
+        state: started
+
+    - name: configure pg_hba.conf
+    lineinfile:
+        path: /etc/postgresql/12/main/pg_hba.conf
+        line: 'host    all             all             10.0.2.2/32             trust'
+        state: present
+
+    - name: configure postgresql.conf
+    lineinfile:
+        path: /etc/postgresql/12/main/postgresql.conf
+        line: 'listen_addresses = *'
+        state: present     // меняем конфиги чтобы затем подключится с хоста на ноду
+
+    - name: create database user
+    become: yes
+    become_user: postgres
+    become_method: sudo
+    vars:
+        ansible_become_allow_world_readable_tmpfiles: True
+    postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        role_attr_flags: SUPERUSER
+
+    - name: create database
+    become: yes
+    become_user: postgres
+    become_method: sudo
+    vars:
+        ansible_become_allow_world_readable_tmpfiles: True
+    postgresql_db:
+        name: "{{ db_name }}"
+        encoding: UTF-8
+        owner: "{{ db_user }}"
+
+    - name: create table
+    become: yes
+    become_user: postgres
+    become_method: sudo
+    vars:
+        ansible_become_allow_world_readable_tmpfiles: True
+    postgresql_table:
+        db: "{{ db_name }}"
+        name: table
+        columns:
+        - key SERIAL PRIMARY KEY
+        - value text
+
+    - name: insert values into table
+    become: yes
+    become_user: postgres
+    become_method: sudo
+    vars:
+        ansible_become_allow_world_readable_tmpfiles: True
+    postgresql_query:
+        db: "{{ db_name }}"
+        query:
+        INSERT INTO "table" (value) VALUES ('sometext1'), ('sometext2'), ('sometext3')
 
 ## Part 2. Service Discovery

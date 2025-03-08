@@ -1,57 +1,13 @@
-- hosts: servers
+---
+- hosts: node01
   remote_user: vagrant
   become: true
-  tasks:
-    - name: install dependencies
-      apt:
-        update_cache: yes
-        pkg:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gnupg-agent
-          - software-properties-common
+  roles:
+    - application
 
-    - name: add GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
-
-    - name: add docker repository to apt
-      apt_repository:
-        repo: deb https://download.docker.com/linux/ubuntu bionic stable
-        state: present
-
-    - name: install docker
-      apt:
-        pkg:
-          - containerd.io
-          - docker-ce
-          - docker-ce-cli
-
-    - name: check docker is active
-      service:
-        name: docker
-        state: started
-        enabled: yes
-
-    - name: check for group existence
-      group:
-        name: docker
-
-    - name: adding vagrant user to docker group
-      user:
-        name: vagrant
-        groups: docker
-        append: yes
-
-    - name: copy docker-compose.yaml
-      copy:
-        src: /home/vagrant/src/docker-compose.yaml
-        dest: /home/vagrant/docker-compose.yaml
-
-    - name: run docker compose in detached mode
-      community.docker.docker_compose_v2:
-        project_src: /home/vagrant
-        state: present
-        pull: always
+- hosts: node02
+  remote_user: vagrant
+  become: true
+  roles:
+    - apache
+    - postgres
