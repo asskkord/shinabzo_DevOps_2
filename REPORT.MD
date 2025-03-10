@@ -415,4 +415,16 @@ tasks/main.yml роли postgresql
 
 Доступ к **API** сервиса отелей
 
-![1741624175012](screenshots/image14.png)
+![hotel_api](screenshots/image14.png)
+
+Доступ к базе данных с хоста
+
+![pg_access](screenshots/image15.png)
+
+Проверим работоспособность операций: выполним запрос
+
+`DELETE FROM hotels`
+
+Убедимся, постучавшись в **API**, что данные удалились
+
+![api_deleted](screenshots/image16.png)
