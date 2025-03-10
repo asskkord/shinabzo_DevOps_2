@@ -37,6 +37,12 @@
     line: "listen_addresses = '*'"
     state: present
 
+- name: restart postgresql
+  service:
+    name: postgresql
+    enabled: yes
+    state: restarted
+
 - name: create database user
   become: yes
   become_user: postgres
@@ -58,27 +64,3 @@
     name: "{{ db_name }}"
     encoding: UTF-8
     owner: "{{ db_user }}"
-
-- name: create table
-  become: yes
-  become_user: postgres
-  become_method: sudo
-  vars:
-    ansible_become_allow_world_readable_tmpfiles: True
-  postgresql_table:
-    db: "{{ db_name }}"
-    name: table
-    columns:
-      - key SERIAL PRIMARY KEY
-      - value text
-
-- name: insert values into table
-  become: yes
-  become_user: postgres
-  become_method: sudo
-  vars:
-    ansible_become_allow_world_readable_tmpfiles: True
-  postgresql_query:
-    db: "{{ db_name }}"
-    query:
-      INSERT INTO "table" (value) VALUES ('sometext1'), ('sometext2'), ('sometext3')

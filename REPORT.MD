@@ -229,3 +229,190 @@ tasks/main.yml роли postgresql
 
 
 ## Part 2. Service Discovery
+
+Проделываем те же шаги, что и в предыдущем пункте: пишем **Vagrantfile**, запускаем, прокидываем **ssh** ключи с **manager** ноды на все остальные. Устанавливаем **Ansible**.
+
+Создадим 4 роли, файл **hosts**, **playbook.yml**
+
+![4roles](screenshots/image12.png)
+
+**hosts**
+---
+    [consul_server]
+    192.168.100.101
+
+    [api]
+    192.168.100.102
+
+    [db]
+    192.168.100.103
+
+**playbook.yml**
+---
+    - hosts: consul_server
+    remote_user: vagrant
+    become: true
+    roles:
+        - install_consul_server
+
+    - hosts: api
+    remote_user: vagrant
+    become: true
+    roles:
+        - install_consul_client
+        - install_hotels_service
+
+    - hosts: db
+    remote_user: vagrant
+    become: true
+    roles:
+        - install_consul_client
+        - install_db
+
+Напишем 2 **consul** конфига
+
+**consul_server.hcl**
+---
+    data_dir = "/home/vagrant/data"
+    server = true
+    bind_addr = "0.0.0.0"
+    bootstrap_expect = 1
+    advertise_addr = "192.168.100.101"
+    client_addr = "0.0.0.0"
+    ui_config {
+    enabled = true
+    }
+
+**consul_client.hcl**
+---
+    data_dir = "/home/vagrant/data"
+    server = false
+    bind_addr = "0.0.0.0"
+    retry_join = ["192.168.100.101"]
+
+В конце **consul_client.hcl** допишется с помощью плейбука **advertise_addr**, уникальный для каждой клиент-ноды.
+
+**task/main.yml** для **consul_server**
+---
+    # tasks file for install_consul_server
+    - name: check if archive is already downloaded
+    stat:
+        path: "/home/vagrant/main.zip"
+    register: archive_stat
+
+    - name: download zip archive
+    get_url:
+        url: "https://github.com/asskkord/my_consul/archive/refs/heads/main.zip"
+        dest: "/home/vagrant/main.zip"
+    when: archive_stat.stat.exists == False
+
+    - name: install unzip
+    apt:
+        name: unzip
+
+    - name: extract zip archive(1)
+    unarchive:
+        src: "/home/vagrant/main.zip"
+        dest: "/home/vagrant/"
+        remote_src: yes
+
+    - name: extract zip archive(2)
+    unarchive:
+        src: "/home/vagrant/my_consul-main/consul_1.20.4_linux_amd64.zip"
+        dest: "/home/vagrant/my_consul-main/"
+        remote_src: yes
+
+    - name: move files to /usr/bin
+    copy:
+        src: "/home/vagrant/my_consul-main/consul"
+        dest: "/usr/local/bin/consul"
+        mode: '0755'
+        remote_src: yes
+
+    - name: copy consul_server.hcl
+    copy:
+        src: "/vagrant/consul01/consul_server.hcl"
+        dest: "/home/vagrant/consul_server.hcl"
+        remote_src: yes
+
+    - name: copy consul systemd service file
+    copy:
+        src: templates/consul.service
+        dest: /etc/systemd/system/consul.service
+        mode: '0644'
+
+    - name: reload systemd daemon
+    systemd:
+        daemon_reload: yes
+
+    - name: start consul service
+    systemd:
+        name: consul
+        state: started
+        enabled: yes
+
+Эта роль отвечает за установку consul. Т.к. в РФ официально скачать его нельзя, а плейбук писать надо, то я загрузил архив на **github** и подтягивал его уже оттуда. Дальше распаковываем архив, закиываем программу по пути в **PATH**. Создаем **systemd** сервис, по шаблону в папке **templates**, копируем конфиг и запускаем сервис.
+
+Роль для **consul_client** +- такая же как и для **consul_server**, роль **install_db** такая же как роль **postgresql** из 1 таски.
+
+**tasks/main.yml** для **install_db**
+---
+    # tasks file for install_hotels_service
+    - name: copy source files
+    copy:
+        src: "/vagrant/services/hotel-service"
+        dest: "/home/vagrant/hotel-service"
+        remote_src: yes
+
+    - name: apt update cache
+    apt:
+        update_cache: yes
+
+    - name: ppa repo
+    apt_repository: 
+        repo: 'ppa:openjdk-r/ppa'
+        update_cache: yes
+
+    - name: openjdk-8-jdk, maven install
+    apt:
+        name: 
+        - openjdk-8-jdk
+        - maven
+        state: present
+
+    - name: unset MAVEN_CONFIG
+    shell: unset MAVEN_CONFIG
+
+    - name: set MAVEN_CONFIG to empty
+    shell: export MAVEN_CONFIG=""
+
+    - name: run Maven dependency:go-offline
+    shell: /home/vagrant/hotel-service/hotel-service/mvnw dependency:go-offline
+    args:
+        chdir: /home/vagrant/hotel-service/hotel-service
+
+    - name: build Maven project
+    shell: /home/vagrant/hotel-service/hotel-service/mvnw package -DskipTests
+    args:
+        chdir: /home/vagrant/hotel-service/hotel-service
+
+    - name: run
+    shell: java -jar /home/vagrant/hotel-service/hotel-service/target/hotel-service-0.0.1-SNAPSHOT.jar
+    environment:
+        POSTGRES_HOST: "192.168.100.103"
+        POSTGRES_PORT: "5432"
+        POSTGRES_DB: "hotels_db"
+        POSTGRES_USER: "myuser"
+        POSTGRES_PASSWORD: "mypassword"
+
+Копируем исходники проекта, устанавливаем **openjdk**, **maven**. Собираем проект из исходников и запускаем с прокинутыми переменными окружениями.
+
+Имеем: 
+
+**UI** панель консула, с зарегистрированными сервисами
+
+![consul_ui](screenshots/image13.png)
+
+Доступ к **API** сервиса отелей
+
+![1741624175012](screenshots/image14.png)

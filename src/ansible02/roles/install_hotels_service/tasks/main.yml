@@ -1,0 +1,48 @@
+---
+# tasks file for install_hotels_service
+- name: copy source files
+  copy:
+    src: "/vagrant/services/hotel-service"
+    dest: "/home/vagrant/hotel-service"
+    remote_src: yes
+
+- name: apt update cache
+  apt:
+    update_cache: yes
+
+- name: ppa repo
+  apt_repository: 
+    repo: 'ppa:openjdk-r/ppa'
+    update_cache: yes
+
+- name: openjdk-8-jdk, maven install
+  apt:
+    name: 
+      - openjdk-8-jdk
+      - maven
+    state: present
+
+- name: unset MAVEN_CONFIG
+  shell: unset MAVEN_CONFIG
+
+- name: set MAVEN_CONFIG to empty
+  shell: export MAVEN_CONFIG=""
+
+- name: run Maven dependency:go-offline
+  shell: /home/vagrant/hotel-service/hotel-service/mvnw dependency:go-offline
+  args:
+    chdir: /home/vagrant/hotel-service/hotel-service
+
+- name: build Maven project
+  shell: /home/vagrant/hotel-service/hotel-service/mvnw package -DskipTests
+  args:
+    chdir: /home/vagrant/hotel-service/hotel-service
+
+- name: run
+  shell: java -jar /home/vagrant/hotel-service/hotel-service/target/hotel-service-0.0.1-SNAPSHOT.jar
+  environment:
+    POSTGRES_HOST: "192.168.100.103"
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: "hotels_db"
+    POSTGRES_USER: "myuser"
+    POSTGRES_PASSWORD: "mypassword"
