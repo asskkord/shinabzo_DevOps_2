@@ -1,0 +1,66 @@
+---
+# tasks file for install_consul_client
+- name: check if archive is already downloaded
+  stat:
+    path: "/home/vagrant/main.zip"
+  register: archive_stat
+
+- name: download zip archive
+  get_url:
+    url: "https://github.com/asskkord/my_consul/archive/refs/heads/main.zip"
+    dest: "/home/vagrant/main.zip"
+  when: archive_stat.stat.exists == False
+
+- name: install unzip
+  apt:
+    name: unzip
+
+- name: extract zip archive(1)
+  unarchive:
+    src: "/home/vagrant/main.zip"
+    dest: "/home/vagrant/"
+    remote_src: yes
+
+- name: extract zip archive(2)
+  unarchive:
+    src: "/home/vagrant/my_consul-main/consul_1.20.4_linux_amd64.zip"
+    dest: "/home/vagrant/my_consul-main/"
+    remote_src: yes
+
+- name: move files to /usr/bin
+  copy:
+    src: "/home/vagrant/my_consul-main/consul"
+    dest: "/usr/local/bin/consul"
+    mode: '0755'
+    remote_src: yes
+
+- name: copy consul_client.hcl
+  copy:
+    src: "/vagrant/consul01/consul_client.hcl"
+    dest: "/home/vagrant/consul_client.hcl"
+    remote_src: yes
+
+- name: get ip address
+  shell: hostname -I | cut -d' ' -f2
+  register: ip_address
+
+- name: write ip to consul_client.hcl
+  lineinfile:
+    path: "/home/vagrant/consul_client.hcl"
+    line: "advertise_addr = \"{{ ip_address.stdout }}\""
+
+- name: copy consul systemd service file
+  copy:
+    src: templates/consul.service
+    dest: /etc/systemd/system/consul.service
+    mode: '0644'
+
+- name: reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: start consul service
+  systemd:
+    name: consul
+    state: started
+    enabled: yes
